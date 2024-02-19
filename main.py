@@ -12,15 +12,15 @@ from agents import boss_agent, worker_agent
 from config import EMAIL, OPENAI_API_KEY
 from interface import prompt_user
 from utils import (
+    create_index,
     get_key_results,
+    handle_python_result,
+    handle_results,
     insert_doc_llama_index,
     load,
     query_knowledge_base,
-    save,
-    handle_python_result,
-    handle_results,
-    create_index,
     read_file,
+    save,
     select_task,
 )
 
@@ -47,7 +47,7 @@ def run_(
     task_list,
     summaries,
 ):
-    
+
     index = create_index(api_key)
 
     task_list = boss_agent(
@@ -57,7 +57,7 @@ def run_(
         summaries=summaries,
         completed_tasks=completed_tasks,
         previous_task=previous_task,
-        previous_result=previous_result
+        previous_result=previous_result,
     )
 
     if not task_list:
@@ -84,21 +84,32 @@ def run_(
     doc_store["tasks"][doc_store_task_key]["results"] = []
 
     if result_is_python:
-        result = handle_python_result(result, cache, task, doc_store, doc_store_task_key)
+        result = handle_python_result(
+            result, cache, task, doc_store, doc_store_task_key
+        )
 
     if result:
-        handle_results(result, index, doc_store, doc_store_task_key, task_id_counter, RESULT_CUTOFF)
+        handle_results(
+            result, index, doc_store, doc_store_task_key, task_id_counter, RESULT_CUTOFF
+        )
 
         if index.docstore.docs:
-            executive_summary, citation_data = query_knowledge_base(index, list_index=False)
-            insert_doc_llama_index(index=master_index, doc_id=str(task_id_counter), data=executive_summary, metadata={"citation_data": citation_data})
-            doc_store["tasks"][doc_store_task_key]["executive_summary"] = executive_summary
+            executive_summary, citation_data = query_knowledge_base(
+                index, list_index=False
+            )
+            insert_doc_llama_index(
+                index=master_index,
+                doc_id=str(task_id_counter),
+                data=executive_summary,
+                metadata={"citation_data": citation_data},
+            )
+            doc_store["tasks"][doc_store_task_key][
+                "executive_summary"
+            ] = executive_summary
             summaries.append(executive_summary)
             index = create_index(api_key=api_key)
 
     return result, task, task_list, summaries
-
-    
 
 
 def run(
@@ -149,7 +160,9 @@ def run(
         insert_doc_llama_index(temp_index, data=my_data, doc_id="my_data")
         executive_summary, _ = query_knowledge_base(temp_index, list_index=False)
 
-        insert_doc_llama_index(index=master_index, doc_id="my_data", data=executive_summary)
+        insert_doc_llama_index(
+            index=master_index, doc_id="my_data", data=executive_summary
+        )
         summaries.append(executive_summary)
 
     doc_store = {"tasks": {}}
@@ -168,11 +181,10 @@ def run(
     print(Fore.CYAN, "\033[1m\n*****OBJECTIVE*****\n\033[0m")
     print(OBJECTIVE)
 
-
     result, completed_tasks = [], []
     task = ""
     task_list = deque()
-    cache=defaultdict(list)
+    cache = defaultdict(list)
 
     for _ in range(MAX_ITERATIONS):
         result, task, task_list, summaries = run_(
@@ -191,9 +203,8 @@ def run(
             previous_result=result,
             summaries=summaries,
         )
-        
+
         task_id_counter += 1
-        
 
     doc_store["key_results"] = get_key_results(master_index, OBJECTIVE, top_k=20)
 
@@ -207,7 +218,7 @@ def run(
         completed_tasks,
         cache,
         reload_count,
-        summaries
+        summaries,
     )
 
     end_time = time.time()
@@ -216,11 +227,18 @@ def run(
 
 
 if __name__ == "__main__":
-    fig = Figlet(font='slant')
+    fig = Figlet(font="slant")
     title_art = fig.renderText("INSIGHT")
     print(Fore.LIGHTMAGENTA_EX + f"\033[1m{title_art}\033[0m")
 
     objective, tool_flags, iterations, reload_path, my_data_path = prompt_user()
     tools = [key for key, value in tool_flags.items() if value]
 
-    run(api_key=api_key, OBJECTIVE=objective, MAX_ITERATIONS=iterations, TOOLS=tools, my_data_path=my_data_path, reload_path=reload_path)
+    run(
+        api_key=api_key,
+        OBJECTIVE=objective,
+        MAX_ITERATIONS=iterations,
+        TOOLS=tools,
+        my_data_path=my_data_path,
+        reload_path=reload_path,
+    )

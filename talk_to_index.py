@@ -1,16 +1,18 @@
 import os
-from config import EMAIL, OPENAI_API_KEY
-from utils import query_knowledge_base
 import time
+
 from langchain import OpenAI
 from llama_index import GPTVectorStoreIndex, LLMPredictor, ServiceContext
+
+from config import EMAIL, OPENAI_API_KEY
+from utils import query_knowledge_base
 
 
 def query_data(index):
     while True:
         try:
             query = input("Please enter your question (or 'exit' to quit): ").strip()
-            
+
             # If the user wants to exit, break the loop
             if query.lower() == "exit":
                 break
@@ -20,7 +22,7 @@ def query_data(index):
                 query=query,
                 response_mode="tree_summarize",
                 top_k=50,
-                list_index=False
+                list_index=False,
             )
 
             print(reponse, citation_data)
@@ -33,10 +35,11 @@ def query_data(index):
         # To avoid potential endless loops, a small delay is introduced
         time.sleep(0.1)
 
+
 if __name__ == "__main__":
     api_key = OPENAI_API_KEY or os.environ["OPENAI_API_KEY"]
 
-    PATH_TO_INDEX = 'out/Cure breast cancer_2023-04-29_14-58-41/index.json'
+    PATH_TO_INDEX = "out/Cure breast cancer_2023-04-29_14-58-41/index.json"
 
     llm_predictor = LLMPredictor(
         llm=OpenAI(

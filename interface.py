@@ -1,7 +1,10 @@
-from colorama import Fore
-import os
 import json
+import os
+
+from colorama import Fore
+
 from utils import get_input
+
 
 def get_objective(path):
     state_file_path = os.path.join(path, "state.json")
@@ -29,14 +32,20 @@ def get_objective(path):
 
 def prompt_user():
     reload_path = None
-    execution_type = get_input("Would you like to run a new execution (1) or resume an old execution (2)? ", type_=int, range_=(1, 2))
+    execution_type = get_input(
+        "Would you like to run a new execution (1) or resume an old execution (2)? ",
+        type_=int,
+        range_=(1, 2),
+    )
 
     if execution_type == 1:
         objective = get_input("Enter your objective: ")
         print(f"Your objective is: {objective}")
     elif execution_type == 2:
         while True:
-            reload_path = get_input("Enter the path to your previous execution (e.g. out/Cure breast cancer_2023-04-29_15-13-10): ")
+            reload_path = get_input(
+                "Enter the path to your previous execution (e.g. out/Cure breast cancer_2023-04-29_15-13-10): "
+            )
 
             if os.path.isdir(reload_path):
                 break
@@ -64,7 +73,11 @@ def prompt_user():
     iterations_prompt = "How many iterations would you like to run? "
     iterations = get_input(iterations_prompt, type_=int, min_=1)
 
-    document_check = get_input("Would you like to load your own data as a document? Type 1 for yes and 0 for no: ", type_=int, range_=(0, 1))
+    document_check = get_input(
+        "Would you like to load your own data as a document? Type 1 for yes and 0 for no: ",
+        type_=int,
+        range_=(0, 1),
+    )
     document_path = None
     if document_check == 1:
         while True:
