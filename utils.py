@@ -15,32 +15,39 @@ import tiktoken
 from colorama import Fore
 from langchain import OpenAI
 from langchain.chat_models import ChatOpenAI
-from llama_index import Document, GPTVectorStoreIndex, LLMPredictor, ServiceContext, GPTListIndex
-from llama_index.indices.composability import ComposableGraph
-from llama_index.retrievers import VectorIndexRetriever
-from llama_index.query_engine import RetrieverQueryEngine
-from llama_index import StorageContext, load_index_from_storage, ServiceContext
-
 from llama_index import (
-    VectorStoreIndex,
+    Document,
+    GPTListIndex,
+    GPTVectorStoreIndex,
+    LLMPredictor,
     ResponseSynthesizer,
+    ServiceContext,
+    StorageContext,
+    VectorStoreIndex,
+    load_index_from_storage,
 )
-
+from llama_index.indices.composability import ComposableGraph
+from llama_index.query_engine import RetrieverQueryEngine
+from llama_index.retrievers import VectorIndexRetriever
 
 from api.mygene_api import mygene_api
-from api.pubmed_api import pubmed_api
 from api.myvariant_api import myvariant_api
+from api.pubmed_api import pubmed_api
 from config import OPENAI_API_KEY
 
 logging.getLogger("llama_index").setLevel(logging.WARNING)
 
-#file_handler = logging.FileHandler('utils.log')
+# file_handler = logging.FileHandler('utils.log')
 # Configure the logging settings
-#logging.basicConfig(level=logging.INFO, handlers=[file_handler])
+# logging.basicConfig(level=logging.INFO, handlers=[file_handler])
 
 
 MAX_TOKENS = 4097
-api_info_mapping = {"mygene": mygene_api, "PubMed": pubmed_api, "myvariant": myvariant_api}
+api_info_mapping = {
+    "mygene": mygene_api,
+    "PubMed": pubmed_api,
+    "myvariant": myvariant_api,
+}
 
 api_key = OPENAI_API_KEY or os.environ["OPENAI_API_KEY"]
 openai.api_key = api_key
@@ -75,11 +82,17 @@ def get_input(prompt, type_=None, min_=None, max_=None, range_=None):
 def select_task(task_list):
     # Task list is actually a Queue
     task_list = list(task_list)
-    print('\n\n')
-    choice = get_input(Fore.LIGHTGREEN_EX + "\033[1mWhich task would you like to execute? Type 0 to create your own task! \033[0m", type_=int, min_=0, max_=len(task_list))
+    print("\n\n")
+    choice = get_input(
+        Fore.LIGHTGREEN_EX
+        + "\033[1mWhich task would you like to execute? Type 0 to create your own task! \033[0m",
+        type_=int,
+        min_=0,
+        max_=len(task_list),
+    )
     if choice == 0:
         task = input(Fore.LIGHTGREEN_EX + "\033[1mWrite your task! \033[0m")
-    else:    
+    else:
         task = task_list.pop(choice - 1)
 
     return task, deque(task_list)
@@ -97,9 +110,11 @@ def get_key_results(index, objective, top_k=20, additional_queries=[]):
     """Run final queries over retrieved documents and store in doc_store."""
 
     if not index.docstore.docs:
-        print(Fore.RED + "\033[1m\n! WARNING: NO TASKS RETURNED RESULTS. PLEASE TWEAK YOUR OBJECTIVE AND CHECK SPELLING. !\n\033[0m")
+        print(
+            Fore.RED
+            + "\033[1m\n! WARNING: NO TASKS RETURNED RESULTS. PLEASE TWEAK YOUR OBJECTIVE AND CHECK SPELLING. !\n\033[0m"
+        )
         return []
-
 
     print(Fore.CYAN + "\033[1m\n*****COMPILING KEY RESULTS*****\n\033[0m")
 
@@ -117,7 +132,9 @@ def get_key_results(index, objective, top_k=20, additional_queries=[]):
         print(Fore.CYAN + f"\nCOMPILING RESULT {query}\n")
         res = None
         try:
-            res, citation_data = query_knowledge_base(index=index, query=query, list_index=False, top_k=top_k)
+            res, citation_data = query_knowledge_base(
+                index=index, query=query, list_index=False, top_k=top_k
+            )
         except Exception as e:
             print(f"Exception getting key result {query}, error {e}")
 
@@ -125,7 +142,9 @@ def get_key_results(index, objective, top_k=20, additional_queries=[]):
             query = f"## {query}\n\n"
             res_html = markdown.markdown(res)
             res_citation = markdown.markdown(citation_data)
-            key_results.append((query, f"{res_html}\n\n### Citations\n\n{res_citation}\n\n"))
+            key_results.append(
+                (query, f"{res_html}\n\n### Citations\n\n{res_citation}\n\n")
+            )
 
     print(Fore.CYAN + f"\nRESULTS COMPILED. SAVED TO DIRECTORY `out`\n")
 
@@ -178,7 +197,7 @@ def process_myvariant_result(results):
         if rsid:
             variant_data += f"rsID: {rsid}\n"
 
-        processed_result.append((variant_data,{"citation_data": citation_data}))
+        processed_result.append((variant_data, {"citation_data": citation_data}))
 
     return processed_result
 
@@ -216,7 +235,7 @@ def process_mygene_result(results):
             output_summary += f"Symbol: {symbol}\n"
         if taxid:
             output_summary += f"Tax ID: {taxid}\n"
-        if type_of_gene and type_of_gene != 'unknown':
+        if type_of_gene and type_of_gene != "unknown":
             output_summary += f"Type of gene: {type_of_gene}\n"
         if pos:
             output_summary += f"Position: {pos}\n"
@@ -238,10 +257,9 @@ def process_mygene_result(results):
 
         output_summary = output_summary.strip()
 
-        #logging.info(f"Mygene Summary result {name}, length is {str(len(output_summary))}")
+        # logging.info(f"Mygene Summary result {name}, length is {str(len(output_summary))}")
         if output_summary:
             processed_result.append((output_summary, {"citation_data": citation_data}))
-        
 
         # Pathway
         pathway = json_data.get("pathway")
@@ -253,14 +271,20 @@ def process_mygene_result(results):
             netpath = pathway.get("netpath", [])
             biocarta = pathway.get("biocarta", [])
 
-            pathway_elements = {"kegg": kegg, "pid": pid, "reactome": reactome, "wikipathways": wikipathways, "netpath": netpath, "biocarta": biocarta}
+            pathway_elements = {
+                "kegg": kegg,
+                "pid": pid,
+                "reactome": reactome,
+                "wikipathways": wikipathways,
+                "netpath": netpath,
+                "biocarta": biocarta,
+            }
 
             # mygene returns dicts instead of lists if singleton
             # Wrap with list if not list
-            for k,v in pathway_elements.items():
+            for k, v in pathway_elements.items():
                 if type(v) is not list:
                     pathway_elements[k] = [v]
-
 
             output_pathway = ""
             citation_data = ""
@@ -271,7 +295,7 @@ def process_mygene_result(results):
                 output_pathway += f"Symbol: {symbol}\n"
             if taxid:
                 output_pathway += f"Tax ID: {taxid}\n"
-            if type_of_gene and type_of_gene != 'unknown':
+            if type_of_gene and type_of_gene != "unknown":
                 output_pathway += f"Type of gene: {type_of_gene}\n"
             if refseq_genomic:
                 output_pathway += f"RefSeq genomic: {', '.join(refseq_genomic)}\n"
@@ -282,17 +306,19 @@ def process_mygene_result(results):
 
             output_pathway += f"PATHWAYS\n\n"
 
-            for k,v in pathway_elements.items():
+            for k, v in pathway_elements.items():
                 output_pathway += f"\n{k}:\n"
                 for item in v:
                     output_pathway += f" ID: {item.get('id', '')}"
                     output_pathway += f" Name: {item.get('name', '')}"
 
-            #logging.info(f"Mygene Pathway result {name}, length is {len(output_pathway)}")
+            # logging.info(f"Mygene Pathway result {name}, length is {len(output_pathway)}")
 
             output_pathway = output_pathway.strip()
             if output_pathway:
-                processed_result.append((output_pathway,{"citation_data": citation_data}))
+                processed_result.append(
+                    (output_pathway, {"citation_data": citation_data})
+                )
 
     return processed_result
 
@@ -304,7 +330,7 @@ def process_pubmed_result(result):
         print(f"Cannot parse pubmed result, expected xml. {e}")
         print("Adding whole document. Note this will lead to suboptimal results.")
         return result if isinstance(result, list) else [result]
-    
+
     processed_result = []
 
     for article in root:
@@ -343,7 +369,7 @@ def process_pubmed_result(result):
                 res_ += f"{doi.text}\n"
 
         if res_:
-            processed_result.append((res_,{"citation_data": citation_data}))
+            processed_result.append((res_, {"citation_data": citation_data}))
 
     return processed_result
 
@@ -423,10 +449,9 @@ def insert_doc_llama_index(index, doc_id, data, metadata={}, embedding=None):
     if not embedding:
         embedding = get_ada_embedding(data)
     doc = Document(text=data, embedding=embedding, doc_id=doc_id, metadata=metadata)
-    doc.excluded_llm_metadata_keys = ['citation_data']
-    doc.excluded_embed_metadata_keys = ['citation_data']
+    doc.excluded_llm_metadata_keys = ["citation_data"]
+    doc.excluded_embed_metadata_keys = ["citation_data"]
     index.insert(doc)
-
 
 
 def handle_python_result(result, cache, task, doc_store, doc_store_task_key):
@@ -436,63 +461,91 @@ def handle_python_result(result, cache, task, doc_store, doc_store_task_key):
     doc_store["tasks"][doc_store_task_key]["result_code"] = result
     tool = task.split(":")[0]
     if tool == "MYGENE":
-        result = "from api.mygene_wrapper import mygene_wrapper\n" + result + "\nret = mygene_wrapper(query_term, size, from_)"
+        result = (
+            "from api.mygene_wrapper import mygene_wrapper\n"
+            + result
+            + "\nret = mygene_wrapper(query_term, size, from_)"
+        )
     elif tool == "MYVARIANT":
-        result = "from api.myvariant_wrapper import myvariant_wrapper\n" + result + "\nret = myvariant_wrapper(query_term)"
+        result = (
+            "from api.myvariant_wrapper import myvariant_wrapper\n"
+            + result
+            + "\nret = myvariant_wrapper(query_term)"
+        )
     elif tool == "PUBMED":
-        result = "from api.pubmed_wrapper import pubmed_wrapper\n" + result + "\nret = pubmed_wrapper(query_term, retmax, retstart)"
+        result = (
+            "from api.pubmed_wrapper import pubmed_wrapper\n"
+            + result
+            + "\nret = pubmed_wrapper(query_term, retmax, retstart)"
+        )
 
     executed_result = execute_python(result)
 
-    
     if type(executed_result) is list:
-        executed_result = list(filter(lambda x : x, executed_result))
+        executed_result = list(filter(lambda x: x, executed_result))
 
-    if (executed_result is not None) and (not executed_result): # Execution complete succesfully, but executed result was empty list
+    if (executed_result is not None) and (
+        not executed_result
+    ):  # Execution complete succesfully, but executed result was empty list
         results_returned = False
         result = "NOTE: Code returned no results\n\n" + result
-        
+
         print(Fore.BLUE + f"\nTask '{task}' completed but returned no results")
 
     if "MYVARIANT" in task:
         if results_returned:
             cache["MYVARIANT"].append(f"---\n{params}---\n")
         else:
-            cache["MYVARIANT"].append(f"---\nNote: This call returned no results\n{params}---\n")
+            cache["MYVARIANT"].append(
+                f"---\nNote: This call returned no results\n{params}---\n"
+            )
         processed_result = process_myvariant_result(executed_result)
 
     if "MYGENE" in task:
         if results_returned:
             cache["MYGENE"].append(f"---\n{params}---\n")
         else:
-            cache["MYGENE"].append(f"---\nNote: This call returned no results\n{params}---\n")
+            cache["MYGENE"].append(
+                f"---\nNote: This call returned no results\n{params}---\n"
+            )
         processed_result = process_mygene_result(executed_result)
 
     if "PUBMED" in task:
         if results_returned:
             cache["PUBMED"].append(f"---\n{params}---\n")
         else:
-            cache["PUBMED"].append(f"---\nNote: This call returned no results\n{params}---\n")
+            cache["PUBMED"].append(
+                f"---\nNote: This call returned no results\n{params}---\n"
+            )
 
         processed_result = process_pubmed_result(executed_result)
 
     if executed_result is None:
         result = "NOTE: Code did not run succesfully\n\n" + result
-        print(Fore.BLUE + f"Task '{task}' failed. Code {result} did not run succesfully.")
+        print(
+            Fore.BLUE + f"Task '{task}' failed. Code {result} did not run succesfully."
+        )
         if "MYGENE" in task:
-            cache["MYGENE"].append(f"---\nNote: This call did not run succesfully\n{params}---\n")
+            cache["MYGENE"].append(
+                f"---\nNote: This call did not run succesfully\n{params}---\n"
+            )
         if "PUBMED" in task:
-            cache["PUBMED"].append(f"---\nNote: This call did not run succesfully\n{params}---\n")
+            cache["PUBMED"].append(
+                f"---\nNote: This call did not run succesfully\n{params}---\n"
+            )
         if "MYVARIANT" in task:
-            cache["MYVARIANT"].append(f"---\nNote: This call did not run succesfully\n{params}---\n")
+            cache["MYVARIANT"].append(
+                f"---\nNote: This call did not run succesfully\n{params}---\n"
+            )
 
         return
-
 
     return processed_result
 
 
-def handle_results(result, index, doc_store, doc_store_key, task_id_counter, RESULT_CUTOFF):
+def handle_results(
+    result, index, doc_store, doc_store_key, task_id_counter, RESULT_CUTOFF
+):
 
     for i, r in enumerate(result):
         res, metadata = r[0], r[1]
@@ -501,7 +554,13 @@ def handle_results(result, index, doc_store, doc_store_key, task_id_counter, RES
         ]  # Occasionally an enormous result will slow the program to a halt. Not ideal to lose results but putting in place for now.
         vectorized_data = get_ada_embedding(res)
         task_id = f"doc_id_{task_id_counter}_{i}"
-        insert_doc_llama_index(index=index, doc_id=task_id, data=res, metadata=metadata, embedding=vectorized_data)
+        insert_doc_llama_index(
+            index=index,
+            doc_id=task_id,
+            data=res,
+            metadata=metadata,
+            embedding=vectorized_data,
+        )
 
         doc_store["tasks"][doc_store_key]["results"].append(
             {
@@ -518,16 +577,15 @@ def query_knowledge_base(
     query="Give a detailed but terse overview of all the information. Start with a high level summary and then go into details. Do not include any further instruction. Do not include filler words.",
     response_mode="tree_summarize",
     top_k=50,
-    list_index=False
+    list_index=False,
 ):
     if not index.docstore.docs:
         print(Fore.RED + "NO INFORMATION IN LLAMA INDEX")
         return
-    
 
     # configure retriever
     retriever = VectorIndexRetriever(
-        index=index, 
+        index=index,
         similarity_top_k=top_k,
     )
 
@@ -541,11 +599,9 @@ def query_knowledge_base(
         retriever=retriever,
         response_synthesizer=response_synthesizer,
     )
-    
+
     if list_index:
-        query_response = index.query(
-            query, response_mode="default"
-        )
+        query_response = index.query(query, response_mode="default")
     else:
         # From llama index docs: Empirically, setting response_mode="tree_summarize" also leads to better summarization results.
         query_response = query_engine.query(query)
@@ -553,78 +609,106 @@ def query_knowledge_base(
     extra_info = ""
     if query_response.metadata:
         try:
-            extra_info = [x.get("citation_data") for x in query_response.metadata.values()]
+            extra_info = [
+                x.get("citation_data") for x in query_response.metadata.values()
+            ]
             if not any(extra_info):
                 extra_info = []
         except Exception as e:
             print("Issue getting extra info from llama index")
 
-    return query_response.response, '\n\n'.join(extra_info)
+    return query_response.response, "\n\n".join(extra_info)
 
 
-def create_index(api_key,summaries=[], temperature=0.0, model_name="gpt-3.5-turbo-16k", max_tokens=6000):
+def create_index(
+    api_key,
+    summaries=[],
+    temperature=0.0,
+    model_name="gpt-3.5-turbo-16k",
+    max_tokens=6000,
+):
     llm_predictor = LLMPredictor(
         llm=ChatOpenAI(
             temperature=temperature,
             openai_api_key=api_key,
             model_name=model_name,
             max_tokens=max_tokens,
-            )
+        )
     )
     documents = []
     for i, summary in enumerate(summaries):
         doc = Document(text=summary, doc_id=str(i))
-        doc.excluded_llm_metadata_keys = ['citation_data']
-        doc.excluded_embed_metadata_keys = ['citation_data']
+        doc.excluded_llm_metadata_keys = ["citation_data"]
+        doc.excluded_embed_metadata_keys = ["citation_data"]
         documents.append(doc)
 
-    service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, chunk_size=4000)
+    service_context = ServiceContext.from_defaults(
+        llm_predictor=llm_predictor, chunk_size=4000
+    )
     return GPTVectorStoreIndex(documents, service_context=service_context)
 
 
-def create_graph_index(api_key, indicies=[], summaries=[], temperature=0.0, model_name="text-davinci-003", max_tokens=2000):
+def create_graph_index(
+    api_key,
+    indicies=[],
+    summaries=[],
+    temperature=0.0,
+    model_name="text-davinci-003",
+    max_tokens=2000,
+):
     llm_predictor = LLMPredictor(
         llm=OpenAI(
             temperature=temperature,
             openai_api_key=api_key,
             model_name=model_name,
             max_tokens=max_tokens,
-            )
+        )
     )
     service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor)
-
 
     graph = ComposableGraph.from_indices(
         GPTListIndex,
         indicies,
         index_summaries=summaries,
-        service_context=service_context
+        service_context=service_context,
     )
 
     return graph
 
 
-def create_list_index(api_key, summaries=[], temperature=0.0, model_name="text-davinci-003", max_tokens=2000):
+def create_list_index(
+    api_key,
+    summaries=[],
+    temperature=0.0,
+    model_name="text-davinci-003",
+    max_tokens=2000,
+):
     llm_predictor = LLMPredictor(
         llm=OpenAI(
             temperature=temperature,
             openai_api_key=api_key,
             model_name=model_name,
             max_tokens=max_tokens,
-            )
+        )
     )
     service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor)
     documents = []
     for i, summary in enumerate(summaries):
         documents.append(Document(text=summary, doc_id=str(i)))
-        
+
     index = GPTListIndex.from_documents(documents, service_context=service_context)
     return index
 
 
 @backoff.on_exception(
     partial(backoff.expo, max_value=50),
-    (openai.error.RateLimitError, openai.error.APIError, openai.error.APIConnectionError, openai.error.ServiceUnavailableError, openai.error.Timeout),
+    (
+        openai.error.RateLimitError,
+        openai.error.APIError,
+        openai.error.APIConnectionError,
+        openai.error.ServiceUnavailableError,
+        openai.error.Timeout,
+    ),
 )
 def get_gpt_completion(
     prompt,
@@ -648,7 +732,13 @@ def get_gpt_completion(
 
 @backoff.on_exception(
     partial(backoff.expo, max_value=50),
-    (openai.error.RateLimitError, openai.error.APIError, openai.error.APIConnectionError, openai.error.ServiceUnavailableError, openai.error.Timeout),
+    (
+        openai.error.RateLimitError,
+        openai.error.APIError,
+        openai.error.APIConnectionError,
+        openai.error.ServiceUnavailableError,
+        openai.error.Timeout,
+    ),
 )
 def get_gpt_chat_completion(
     system_prompt, user_prompt, model="gpt-3.5-turbo-16k", temp=0.0
@@ -689,14 +779,14 @@ def read_file(path, mode="r"):
 
 def sanitize_dir_name(dir_name):
     # Remove invalid characters
-    dir_name = re.sub(r'[<>:"/\|?*]', '_', dir_name)
-    
-    dir_name = dir_name.replace(' ', '_')
-    
+    dir_name = re.sub(r'[<>:"/\|?*]', "_", dir_name)
+
+    dir_name = dir_name.replace(" ", "_")
+
     # Remove leading period
-    if dir_name.startswith('.'):
+    if dir_name.startswith("."):
         dir_name = dir_name[1:]
-    
+
     return dir_name
 
 
@@ -747,7 +837,6 @@ def save(
             write_file(key_findings_path, content, mode="a+")
 
     for task, doc in doc_store["tasks"].items():
-            
 
         doc_path = os.path.join(path, task)
         make_dir(doc_path)
@@ -755,10 +844,12 @@ def save(
         make_dir(result_path)
 
         if "executive_summary" in doc:
-            write_file(os.path.join(result_path, "executive_summary.txt"), doc["executive_summary"])
+            write_file(
+                os.path.join(result_path, "executive_summary.txt"),
+                doc["executive_summary"],
+            )
         if "result_code" in doc:
             write_file(os.path.join(result_path, "api_call.txt"), doc["result_code"])
-        
 
         for i, result in enumerate(doc["results"]):
 
@@ -780,12 +871,18 @@ def load(path):
             max_tokens=6000,
         )
     )
-    service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor, chunk_size=4000)
+    service_context = ServiceContext.from_defaults(
+        llm_predictor=llm_predictor, chunk_size=4000
+    )
 
     # rebuild storage context
-    storage_context = StorageContext.from_defaults(persist_dir=os.path.join(path, "index.json"))
+    storage_context = StorageContext.from_defaults(
+        persist_dir=os.path.join(path, "index.json")
+    )
 
-    index = load_index_from_storage(storage_context=storage_context, service_context=service_context)
+    index = load_index_from_storage(
+        storage_context=storage_context, service_context=service_context
+    )
     state_path = os.path.join(path, "state.json")
     if os.path.exists(state_path):
         with open(state_path, "r") as f:

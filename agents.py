@@ -2,12 +2,17 @@ import os
 from ast import literal_eval
 from collections import deque
 from typing import List
-from colorama import Fore
 
 import openai
+from colorama import Fore
 
 from config import OPENAI_API_KEY
-from utils import generate_tool_prompt, get_gpt_chat_completion, get_gpt_completion, query_knowledge_base
+from utils import (
+    generate_tool_prompt,
+    get_gpt_chat_completion,
+    get_gpt_completion,
+    query_knowledge_base,
+)
 
 openai.api_key = OPENAI_API_KEY or os.environ["OPENAI_API_KEY"]
 
@@ -19,31 +24,28 @@ def boss_agent(
     summaries: List[str],
     completed_tasks: List[str],
     previous_task="",
-    previous_result = None
+    previous_result=None,
 ):
-    
+
     no_result_notification = ""
     if not previous_result and previous_task:
         no_result_notification = f"Note: Task '{previous_task}' completed but returned no results. Please decide if you should retry. If so, please change something so that you will get a result."
-       
-    
+
     if summaries:
-        executive_summary = '\n'.join(summaries)
+        executive_summary = "\n".join(summaries)
     else:
         executive_summary = "No information gathered yet."
 
-    
     print(Fore.CYAN + "\033[1m\n*****EXECUTIVE SUMMARY*****\n\033[0m")
     print(Fore.CYAN + executive_summary)
 
-    
     system_prompt = f"""You are BossGPT, a responsible and organized agent that is responsible for completing a high level and difficult objective.
 As the boss, your goal is to break the high level objective down into small and managable tasks for your workers. These tasks will be picked up by your worker agents and completed.
 You will also get an executive summary of what your workers have accomplished so far. Use the summary to make decisions about what tasks to do next, what tasks to get rid of, and to reprioritize tasks.
 The highest priority task will be at the top of the task list.
 
 You also have access to some tools. You can create a task for your workers to use any of your tools. You cannot use more than one tool per task. You only have the tools specified in the tools section. Do not make up any tools.
-Your worker agents update the executive summary so that you can use new information from the completed tasks to make informed decisions about what to do next. 
+Your worker agents update the executive summary so that you can use new information from the completed tasks to make informed decisions about what to do next.
 It is ok to create tasks that do not directly help achieve your objective but rather just serve to add useful information.
 
 Tasks should be a simple python array with strings as elements. Priority is only determined by the order of the elements in the array.
@@ -77,7 +79,7 @@ Here is an executive summary of the information gathered so far: {executive_summ
 Note: If a task has already been completed, do not write that same task again in the task list. If you would like a worker to continue or redo a task, be sure to word it a little differently so you don't get the same result.
 
 ===
-    
+
     """.strip()
 
     content = get_gpt_chat_completion(system_prompt, user_prompt, temp=0.0)
@@ -102,7 +104,7 @@ def worker_agent(
     cache,
     TOOLS,
 ):
-    
+
     result_is_python = False
     context = ""
     previous_params = ""
@@ -113,10 +115,9 @@ def worker_agent(
             query=f"Provide as much useful context as possible for this task: {task}",
         )
 
-    
     if any(tool in task for tool in TOOLS):
         result_is_python = True
-    
+
     for tool in TOOLS:
         if tool in task and tool in cache:
             previous_params = cache[tool]
